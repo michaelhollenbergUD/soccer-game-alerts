@@ -74,6 +74,46 @@ jobs:
         print(f"\n⚽ Soccer Games Summary:")
         print(f"Total games found: {len(all_games)}")
         
+        # 🧪 TEST MODE - Send test alert
+        print("\n🧪 TEST MODE: Sending test alert...")
+        webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
+        if webhook_url:
+            test_message = {
+                "text": "🧪 TEST: Soccer bot is working!",
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "🧪 TEST - ⚽ PREMIER LEAGUE - GAME STARTING",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "*Manchester United* vs *Liverpool*"
+                        }
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "⏰ Starting in ~10 minutes • 📺 NBC (TEST ALERT)"
+                            }
+                        ]
+                    }
+                ]
+            }
+            req = urllib.request.Request(webhook_url, data=json.dumps(test_message).encode('utf-8'), headers={'Content-Type': 'application/json'})
+            try:
+                with urllib.request.urlopen(req) as response:
+                    print("✓ Test alert sent to #soccer-trading!")
+            except Exception as e:
+                print(f"✗ Test error: {e}")
+        
         for event in all_games:
             try:
                 game_id = event['id']
