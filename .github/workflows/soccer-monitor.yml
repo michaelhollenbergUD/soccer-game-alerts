@@ -98,7 +98,7 @@ jobs:
                     current_time_utc = datetime.now(timezone.utc)
                     minutes_until = int((game_start - current_time_utc).total_seconds() / 60)
                     
-                    if 0 <= minutes_until <= 20:
+                    if 0 <= minutes_until <= 15:
                         broadcast = competition.get('broadcasts', [{}])[0].get('names', ['No TV info'])[0] if competition.get('broadcasts') else 'No TV info'
                         
                         starting_soon_games.append({
