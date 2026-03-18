@@ -1,0 +1,185 @@
+name: Soccer Game Alerts
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-soccer:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Check for soccer games
+      run: |
+        TODAY=$(TZ='America/New_York' date +%Y%m%d)
+        
+        # Fetch games from all 4 leagues
+        echo "Fetching La Liga..."
+        curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates=$TODAY" > laliga.json
+        
+        echo "Fetching EPL..."
+        curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard?dates=$TODAY" > epl.json
+        
+        echo "Fetching Serie A..."
+        curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?dates=$TODAY" > seriea.json
+        
+        echo "Fetching Champions League..."
+        curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates=$TODAY" > ucl.json
+        
+        touch alerted_games.txt
+        
+        cat << 'EOF' > check_soccer.py
+        import json
+        import os
+        import urllib.request
+        from datetime import datetime, timezone
+        
+        # Read all league data
+        all_games = []
+        leagues = [
+            ('laliga.json', 'La Liga'),
+            ('epl.json', 'Premier League'),
+            ('seriea.json', 'Serie A'),
+            ('ucl.json', 'Champions League')
+        ]
+        
+        for filename, league_name in leagues:
+            try:
+                with open(filename, 'r') as f:
+                    data = json.load(f)
+                    if 'events' in data:
+                        for event in data['events']:
+                            event['league_name'] = league_name
+                            all_games.append(event)
+            except:
+                pass
+        
+        # Read alerted games
+        alerted_games = set()
+        try:
+            with open('alerted_games.txt', 'r') as f:
+                content = f.read().strip()
+                if content:
+                    alerted_games = set(content.split(','))
+        except:
+            pass
+        
+        current_date = datetime.now().strftime('%Y%m%d')
+        alerted_games = {g for g in alerted_games if g.startswith(current_date)}
+        
+        starting_soon_games = []
+        
+        print(f"\n⚽ Soccer Games Summary:")
+        print(f"Total games found: {len(all_games)}")
+        
+        for event in all_games:
+            try:
+                game_id = event['id']
+                league_name = event.get('league_name', 'Unknown')
+                competition = event['competitions'][0]
+                status = competition['status']['type']['name']
+                game_date = competition['date']
+                
+                home_team = next((t for t in competition['competitors'] if t['homeAway'] == 'home'), None)
+                away_team = next((t for t in competition['competitors'] if t['homeAway'] == 'away'), None)
+                
+                if not home_team or not away_team:
+                    continue
+                
+                away_name = away_team['team']['displayName']
+                home_name = home_team['team']['displayName']
+                
+                starting_key = f"{current_date}_{game_id}_starting"
+                
+                if status == 'STATUS_SCHEDULED' and game_date and starting_key not in alerted_games:
+                    game_start = datetime.fromisoformat(game_date.replace('Z', '+00:00'))
+                    current_time_utc = datetime.now(timezone.utc)
+                    minutes_until = int((game_start - current_time_utc).total_seconds() / 60)
+                    
+                    if 0 <= minutes_until <= 20:
+                        broadcast = competition.get('broadcasts', [{}])[0].get('names', ['No TV info'])[0] if competition.get('broadcasts') else 'No TV info'
+                        
+                        starting_soon_games.append({
+                            'away_team': away_name,
+                            'home_team': home_name,
+                            'minutes_until': minutes_until,
+                            'broadcast': broadcast,
+                            'league': league_name
+                        })
+                        alerted_games.add(starting_key)
+                        
+                        # Save immediately to prevent duplicates
+                        with open('alerted_games.txt', 'w') as f:
+                            f.write(','.join(sorted(alerted_games)))
+                        
+                        print(f"  → Alert queued: {away_name} vs {home_name} ({league_name})")
+            except Exception as e:
+                print(f"Error: {e}")
+        
+        webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
+        
+        if starting_soon_games and webhook_url:
+            for game in starting_soon_games:
+                slack_message = {
+                    "text": f"⚽ {game['league']}: {game['away_team']} vs {game['home_team']} in ~{game['minutes_until']} minutes",
+                    "blocks": [
+                        {
+                            "type": "header",
+                            "text": {
+                                "type": "plain_text",
+                                "text": f"⚽ {game['league'].upper()} - GAME STARTING",
+                                "emoji": True
+                            }
+                        },
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": f"*{game['away_team']}* vs *{game['home_team']}*"
+                            }
+                        },
+                        {
+                            "type": "context",
+                            "elements": [
+                                {
+                                    "type": "mrkdwn",
+                                    "text": f"⏰ Starting in ~{game['minutes_until']} minutes • 📺 {game['broadcast']}"
+                                }
+                            ]
+                        }
+                    ]
+                }
+                
+                req = urllib.request.Request(
+                    webhook_url,
+                    data=json.dumps(slack_message).encode('utf-8'),
+                    headers={'Content-Type': 'application/json'}
+                )
+                
+                try:
+                    with urllib.request.urlopen(req) as response:
+                        print(f"✓ Sent: {game['away_team']} vs {game['home_team']}")
+                except Exception as e:
+                    print(f"✗ Error: {e}")
+        else:
+            print("\nNo new game alerts.")
+        
+        with open('alerted_games.txt', 'w') as f:
+            f.write(','.join(sorted(alerted_games)))
+        
+        print(f"\nAlerted games today: {len(alerted_games)}")
+        EOF
+        
+        python3 check_soccer.py
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    
+    - name: Commit state file
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add alerted_games.txt || true
+        git commit -m "Update alerted games state [skip ci]" || true
+        git push || true
