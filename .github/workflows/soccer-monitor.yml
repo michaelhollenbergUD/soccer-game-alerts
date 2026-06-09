@@ -46,6 +46,52 @@ jobs:
         print(f"\n🏆 World Cup Summary:")
         print(f"Total games found: {len(data.get('events', []))}")
         
+        # 🧪 TEST MODE - Send test alert
+        print("\n🧪 TEST MODE: Sending test alert...")
+        webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
+        if webhook_url:
+            test_message = {
+                "text": "🧪 TEST: World Cup bot is working!",
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "🧪 TEST - 🏆 WORLD CUP - FINAL SCORE",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Brazil*\n3"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Argentina*\n2"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "📋 Group A • 📺 FOX (TEST ALERT)"
+                            }
+                        ]
+                    }
+                ]
+            }
+            req = urllib.request.Request(webhook_url, data=json.dumps(test_message).encode('utf-8'), headers={'Content-Type': 'application/json'})
+            try:
+                with urllib.request.urlopen(req) as response:
+                    print("✓ Test alert sent to #soccer-trading!")
+            except Exception as e:
+                print(f"✗ Test error: {e}")
+        
         if 'events' in data and data['events']:
             for event in data['events']:
                 try:
