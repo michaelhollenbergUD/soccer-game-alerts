@@ -1,62 +1,34 @@
-name: Soccer Game Alerts
+name: World Cup Final Scores
 
 on:
   workflow_dispatch:
 
 jobs:
-  check-soccer:
+  check-worldcup:
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
       
-    - name: Check for soccer games
+    - name: Check for World Cup finals
       run: |
         TODAY=$(TZ='America/New_York' date +%Y%m%d)
         
-        # Fetch games from all 4 leagues
-        echo "Fetching La Liga..."
-        curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates=$TODAY" > laliga.json
-        
-        echo "Fetching EPL..."
-        curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard?dates=$TODAY" > epl.json
-        
-        echo "Fetching Serie A..."
-        curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?dates=$TODAY" > seriea.json
-        
-        echo "Fetching Champions League..."
-        curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates=$TODAY" > ucl.json
+        echo "Fetching World Cup games..."
+        curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=$TODAY" > worldcup.json
         
         touch alerted_games.txt
         
-        cat << 'EOF' > check_soccer.py
+        cat << 'EOF' > check_worldcup.py
         import json
         import os
         import urllib.request
-        from datetime import datetime, timezone
+        from datetime import datetime
         
-        # Read all league data
-        all_games = []
-        leagues = [
-            ('laliga.json', 'La Liga'),
-            ('epl.json', 'Premier League'),
-            ('seriea.json', 'Serie A'),
-            ('ucl.json', 'Champions League')
-        ]
+        with open('worldcup.json', 'r') as f:
+            data = json.load(f)
         
-        for filename, league_name in leagues:
-            try:
-                with open(filename, 'r') as f:
-                    data = json.load(f)
-                    if 'events' in data:
-                        for event in data['events']:
-                            event['league_name'] = league_name
-                            all_games.append(event)
-            except:
-                pass
-        
-        # Read alerted games
         alerted_games = set()
         try:
             with open('alerted_games.txt', 'r') as f:
@@ -69,83 +41,93 @@ jobs:
         current_date = datetime.now().strftime('%Y%m%d')
         alerted_games = {g for g in alerted_games if g.startswith(current_date)}
         
-        starting_soon_games = []
+        final_score_games = []
         
-        print(f"\n⚽ Soccer Games Summary:")
-        print(f"Total games found: {len(all_games)}")
+        print(f"\n🏆 World Cup Summary:")
+        print(f"Total games found: {len(data.get('events', []))}")
         
-        for event in all_games:
-            try:
-                game_id = event['id']
-                league_name = event.get('league_name', 'Unknown')
-                competition = event['competitions'][0]
-                status = competition['status']['type']['name']
-                game_date = competition['date']
-                
-                home_team = next((t for t in competition['competitors'] if t['homeAway'] == 'home'), None)
-                away_team = next((t for t in competition['competitors'] if t['homeAway'] == 'away'), None)
-                
-                if not home_team or not away_team:
-                    continue
-                
-                away_name = away_team['team']['displayName']
-                home_name = home_team['team']['displayName']
-                
-                starting_key = f"{current_date}_{game_id}_starting"
-                
-                if status == 'STATUS_SCHEDULED' and game_date and starting_key not in alerted_games:
-                    game_start = datetime.fromisoformat(game_date.replace('Z', '+00:00'))
-                    current_time_utc = datetime.now(timezone.utc)
-                    minutes_until = int((game_start - current_time_utc).total_seconds() / 60)
+        if 'events' in data and data['events']:
+            for event in data['events']:
+                try:
+                    game_id = event['id']
+                    competition = event['competitions'][0]
+                    status = competition['status']['type']['name']
                     
-                    if 0 <= minutes_until <= 15:
+                    home_team = next((t for t in competition['competitors'] if t['homeAway'] == 'home'), None)
+                    away_team = next((t for t in competition['competitors'] if t['homeAway'] == 'away'), None)
+                    
+                    if not home_team or not away_team:
+                        continue
+                    
+                    away_name = away_team['team']['displayName']
+                    home_name = home_team['team']['displayName']
+                    away_score = away_team['score']
+                    home_score = home_team['score']
+                    
+                    # Get group information
+                    group_info = event.get('season', {}).get('type', {}).get('abbreviation', '')
+                    if not group_info:
+                        # Try alternate location for group
+                        group_info = competition.get('notes', [{}])[0].get('headline', '') if competition.get('notes') else ''
+                    if not group_info:
+                        group_info = 'Group Unknown'
+                    
+                    final_key = f"{current_date}_{game_id}_final"
+                    
+                    if status == 'STATUS_FINAL' and final_key not in alerted_games:
                         broadcast = competition.get('broadcasts', [{}])[0].get('names', ['No TV info'])[0] if competition.get('broadcasts') else 'No TV info'
                         
-                        starting_soon_games.append({
+                        final_score_games.append({
                             'away_team': away_name,
                             'home_team': home_name,
-                            'minutes_until': minutes_until,
+                            'away_score': away_score,
+                            'home_score': home_score,
                             'broadcast': broadcast,
-                            'league': league_name
+                            'group': group_info
                         })
-                        alerted_games.add(starting_key)
+                        alerted_games.add(final_key)
                         
-                        # Save immediately to prevent duplicates
                         with open('alerted_games.txt', 'w') as f:
                             f.write(','.join(sorted(alerted_games)))
                         
-                        print(f"  → Alert queued: {away_name} vs {home_name} ({league_name})")
-            except Exception as e:
-                print(f"Error: {e}")
+                        print(f"  → Final alert queued: {away_name} {away_score} - {home_score} {home_name} ({group_info})")
+                except Exception as e:
+                    print(f"Error: {e}")
         
         webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
         
-        if starting_soon_games and webhook_url:
-            for game in starting_soon_games:
+        if final_score_games and webhook_url:
+            for game in final_score_games:
                 slack_message = {
-                    "text": f"⚽ {game['league']}: {game['away_team']} vs {game['home_team']} in ~{game['minutes_until']} minutes",
+                    "text": f"🏆 WORLD CUP FINAL: {game['away_team']} {game['away_score']} - {game['home_score']} {game['home_team']} ({game['group']})",
                     "blocks": [
                         {
                             "type": "header",
                             "text": {
                                 "type": "plain_text",
-                                "text": f"⚽ {game['league'].upper()} - GAME STARTING",
+                                "text": "🏆 WORLD CUP - FINAL SCORE",
                                 "emoji": True
                             }
                         },
                         {
                             "type": "section",
-                            "text": {
-                                "type": "mrkdwn",
-                                "text": f"*{game['away_team']}* vs *{game['home_team']}*"
-                            }
+                            "fields": [
+                                {
+                                    "type": "mrkdwn",
+                                    "text": f"*{game['away_team']}*\n{game['away_score']}"
+                                },
+                                {
+                                    "type": "mrkdwn",
+                                    "text": f"*{game['home_team']}*\n{game['home_score']}"
+                                }
+                            ]
                         },
                         {
                             "type": "context",
                             "elements": [
                                 {
                                     "type": "mrkdwn",
-                                    "text": f"⏰ Starting in ~{game['minutes_until']} minutes • 📺 {game['broadcast']}"
+                                    "text": f"📋 {game['group']} • 📺 {game['broadcast']}"
                                 }
                             ]
                         }
@@ -160,11 +142,11 @@ jobs:
                 
                 try:
                     with urllib.request.urlopen(req) as response:
-                        print(f"✓ Sent: {game['away_team']} vs {game['home_team']}")
+                        print(f"✓ Sent final: {game['away_team']} {game['away_score']} - {game['home_score']} {game['home_team']}")
                 except Exception as e:
                     print(f"✗ Error: {e}")
         else:
-            print("\nNo new game alerts.")
+            print("\nNo new final score alerts.")
         
         with open('alerted_games.txt', 'w') as f:
             f.write(','.join(sorted(alerted_games)))
@@ -172,7 +154,7 @@ jobs:
         print(f"\nAlerted games today: {len(alerted_games)}")
         EOF
         
-        python3 check_soccer.py
+        python3 check_worldcup.py
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     
