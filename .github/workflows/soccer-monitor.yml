@@ -64,15 +64,27 @@ jobs:
                     
                     away_name = away_team['team']['displayName']
                     home_name = home_team['team']['displayName']
-                    away_score = away_team['score']
-                    home_score = home_team['score']
+                    away_score = away_team.get('score', 0)
+                    home_score = home_team.get('score', 0)
                     
-                    # Get group information
-                    group_info = event.get('season', {}).get('type', {}).get('abbreviation', '')
-                    if not group_info:
-                        group_info = competition.get('notes', [{}])[0].get('headline', '') if competition.get('notes') else ''
-                    if not group_info:
-                        group_info = 'Group Unknown'
+                    # Get group information - try multiple locations
+                    group_info = 'Group Unknown'
+                    try:
+                        season = event.get('season', {})
+                        if isinstance(season, dict):
+                            season_type = season.get('type', {})
+                            if isinstance(season_type, dict):
+                                group_info = season_type.get('abbreviation', 'Group Unknown')
+                    except:
+                        pass
+                    
+                    if group_info == 'Group Unknown':
+                        try:
+                            notes = competition.get('notes', [])
+                            if notes and len(notes) > 0 and isinstance(notes[0], dict):
+                                group_info = notes[0].get('headline', 'Group Unknown')
+                        except:
+                            pass
                     
                     # Separate tracking keys for starting vs final alerts
                     starting_key = f"{current_date}_{game_id}_starting"
