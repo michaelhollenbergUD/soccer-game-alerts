@@ -41,6 +41,8 @@ jobs:
         current_date = datetime.now().strftime('%Y%m%d')
         alerted_games = {g for g in alerted_games if g.startswith(current_date)}
         
+        # Process games
+        starting_soon_games = []
         final_score_games = []
         
         print(f"\n🏆 World Cup Summary:")
@@ -52,6 +54,7 @@ jobs:
                     game_id = event['id']
                     competition = event['competitions'][0]
                     status = competition['status']['type']['name']
+                    game_date = competition.get('date')
                     
                     home_team = next((t for t in competition['competitors'] if t['homeAway'] == 'home'), None)
                     away_team = next((t for t in competition['competitors'] if t['homeAway'] == 'away'), None)
@@ -67,13 +70,38 @@ jobs:
                     # Get group information
                     group_info = event.get('season', {}).get('type', {}).get('abbreviation', '')
                     if not group_info:
-                        # Try alternate location for group
                         group_info = competition.get('notes', [{}])[0].get('headline', '') if competition.get('notes') else ''
                     if not group_info:
                         group_info = 'Group Unknown'
                     
+                    # Separate tracking keys for starting vs final alerts
+                    starting_key = f"{current_date}_{game_id}_starting"
                     final_key = f"{current_date}_{game_id}_final"
                     
+                    # Check for games starting soon (0-15 minutes)
+                    if status == 'STATUS_SCHEDULED' and game_date and starting_key not in alerted_games:
+                        game_start = datetime.fromisoformat(game_date.replace('Z', '+00:00'))
+                        current_time_utc = datetime.now(timezone.utc)
+                        minutes_until = int((game_start - current_time_utc).total_seconds() / 60)
+                        
+                        if 0 <= minutes_until <= 15:
+                            broadcast = competition.get('broadcasts', [{}])[0].get('names', ['No TV info'])[0] if competition.get('broadcasts') else 'No TV info'
+                            
+                            starting_soon_games.append({
+                                'away_team': away_name,
+                                'home_team': home_name,
+                                'minutes_until': minutes_until,
+                                'broadcast': broadcast,
+                                'group': group_info
+                            })
+                            alerted_games.add(starting_key)
+                            
+                            with open('alerted_games.txt', 'w') as f:
+                                f.write(','.join(sorted(alerted_games)))
+                            
+                            print(f"  → Starting alert queued: {away_name} vs {home_name}")
+                    
+                    # Check for games that are FINAL
                     if status == 'STATUS_FINAL' and final_key not in alerted_games:
                         broadcast = competition.get('broadcasts', [{}])[0].get('names', ['No TV info'])[0] if competition.get('broadcasts') else 'No TV info'
                         
@@ -96,43 +124,78 @@ jobs:
         
         webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
         
-        if final_score_games and webhook_url:
-            for game in final_score_games:
-                slack_message = {
-                    "text": f"🏆 WORLD CUP FINAL: {game['away_team']} {game['away_score']} - {game['home_score']} {game['home_team']} ({game['group']})",
-                    "blocks": [
-                        {
-                            "type": "header",
-                            "text": {
-                                "type": "plain_text",
-                                "text": "🏆 WORLD CUP - FINAL SCORE",
-                                "emoji": True
+        all_alerts = starting_soon_games + final_score_games
+        
+        if all_alerts and webhook_url:
+            for game in all_alerts:
+                if game.get('minutes_until') is not None:
+                    # Starting soon alert
+                    slack_message = {
+                        "text": f"🏆 WORLD CUP STARTING: {game['away_team']} vs {game['home_team']} in ~{game['minutes_until']} minutes",
+                        "blocks": [
+                            {
+                                "type": "header",
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "🏆 WORLD CUP - GAME STARTING",
+                                    "emoji": True
+                                }
+                            },
+                            {
+                                "type": "section",
+                                "text": {
+                                    "type": "mrkdwn",
+                                    "text": f"*{game['away_team']}* vs *{game['home_team']}*"
+                                }
+                            },
+                            {
+                                "type": "context",
+                                "elements": [
+                                    {
+                                        "type": "mrkdwn",
+                                        "text": f"📋 {game['group']} • ⏰ Starting in ~{game['minutes_until']} minutes • 📺 {game['broadcast']}"
+                                    }
+                                ]
                             }
-                        },
-                        {
-                            "type": "section",
-                            "fields": [
-                                {
-                                    "type": "mrkdwn",
-                                    "text": f"*{game['away_team']}*\n{game['away_score']}"
-                                },
-                                {
-                                    "type": "mrkdwn",
-                                    "text": f"*{game['home_team']}*\n{game['home_score']}"
+                        ]
+                    }
+                else:
+                    # Final score alert
+                    slack_message = {
+                        "text": f"🏆 WORLD CUP FINAL: {game['away_team']} {game['away_score']} - {game['home_score']} {game['home_team']}",
+                        "blocks": [
+                            {
+                                "type": "header",
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "🏆 WORLD CUP - FINAL SCORE",
+                                    "emoji": True
                                 }
-                            ]
-                        },
-                        {
-                            "type": "context",
-                            "elements": [
-                                {
-                                    "type": "mrkdwn",
-                                    "text": f"📋 {game['group']} • 📺 {game['broadcast']}"
-                                }
-                            ]
-                        }
-                    ]
-                }
+                            },
+                            {
+                                "type": "section",
+                                "fields": [
+                                    {
+                                        "type": "mrkdwn",
+                                        "text": f"*{game['away_team']}*\n{game['away_score']}"
+                                    },
+                                    {
+                                        "type": "mrkdwn",
+                                        "text": f"*{game['home_team']}*\n{game['home_score']}"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "context",
+                                "elements": [
+                                    {
+                                        "type": "mrkdwn",
+                                        "text": f"📋 {game['group']} • 📺 {game['broadcast']}"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
                 
                 req = urllib.request.Request(
                     webhook_url,
@@ -142,11 +205,14 @@ jobs:
                 
                 try:
                     with urllib.request.urlopen(req) as response:
-                        print(f"✓ Sent final: {game['away_team']} {game['away_score']} - {game['home_score']} {game['home_team']}")
+                        if game.get('minutes_until') is not None:
+                            print(f"✓ Sent starting: {game['away_team']} vs {game['home_team']}")
+                        else:
+                            print(f"✓ Sent final: {game['away_team']} {game['away_score']} - {game['home_score']} {game['home_team']}")
                 except Exception as e:
                     print(f"✗ Error: {e}")
         else:
-            print("\nNo new final score alerts.")
+            print("\nNo new World Cup alerts.")
         
         with open('alerted_games.txt', 'w') as f:
             f.write(','.join(sorted(alerted_games)))
