@@ -26,6 +26,22 @@ jobs:
         import urllib.request
         from datetime import datetime, timezone
         
+        # World Cup 2026 Group Mappings
+        TEAM_GROUPS = {
+            'Mexico': 'Group A', 'South Africa': 'Group A', 'Korea Republic': 'Group A', 'Uruguay': 'Group A',
+            'Canada': 'Group B', 'Egypt': 'Group B', 'Qatar': 'Group B', 'Japan': 'Group B',
+            'Brazil': 'Group C', 'Colombia': 'Group C', 'Haiti': 'Group C', 'Paraguay': 'Group C',
+            'USA': 'Group D', 'Morocco': 'Group D', 'Australia': 'Group D',
+            'Germany': 'Group E', 'Italy': 'Group E', 'Hong Kong': 'Group E', 'Thailand': 'Group E',
+            'Netherlands': 'Group F', 'Belgium': 'Group F', 'Iceland': 'Group F',
+            'England': 'Group G', 'IR Iran': 'Group G', 'New Zealand': 'Group G',
+            'Spain': 'Group H', 'Chile': 'Group H', 'Saudi Arabia': 'Group H',
+            'France': 'Group I', 'Venezuela': 'Group I', 'Denmark': 'Group I',
+            'Argentina': 'Group J', 'Algeria': 'Group J', 'Austria': 'Group J', 'Jordan': 'Group J',
+            'Portugal': 'Group K', 'Uzbekistan': 'Group K', 'Sweden': 'Group K',
+            'Croatia': 'Group L', 'Ghana': 'Group L', 'South Korea': 'Group L'
+        }
+        
         with open('worldcup.json', 'r') as f:
             data = json.load(f)
         
@@ -81,24 +97,8 @@ jobs:
                     away_score = away_team.get('score', 0)
                     home_score = home_team.get('score', 0)
                     
-                    # Get group information - try multiple locations
-                    group_info = 'Group Unknown'
-                    try:
-                        season = event.get('season', {})
-                        if isinstance(season, dict):
-                            season_type = season.get('type', {})
-                            if isinstance(season_type, dict):
-                                group_info = season_type.get('abbreviation', 'Group Unknown')
-                    except:
-                        pass
-                    
-                    if group_info == 'Group Unknown':
-                        try:
-                            notes = competition.get('notes', [])
-                            if notes and len(notes) > 0 and isinstance(notes[0], dict):
-                                group_info = notes[0].get('headline', 'Group Unknown')
-                        except:
-                            pass
+                    # Get group from team mapping
+                    group_info = TEAM_GROUPS.get(away_name, TEAM_GROUPS.get(home_name, 'Group Unknown'))
                     
                     # Separate tracking keys for starting vs final alerts
                     starting_key = f"{current_date}_{game_id}_starting"
