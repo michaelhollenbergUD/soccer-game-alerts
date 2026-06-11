@@ -127,8 +127,8 @@ jobs:
                             
                             print(f"  → Starting alert queued: {away_name} vs {home_name}")
                     
-                    # Check for games that are FINAL
-                    if status == 'STATUS_FINAL' and final_key not in alerted_games:
+                    # Check for games that are FINAL (soccer uses STATUS_FULL_TIME)
+                    if (status == 'STATUS_FINAL' or status == 'STATUS_FULL_TIME') and final_key not in alerted_games:
                         broadcast = competition.get('broadcasts', [{}])[0].get('names', ['No TV info'])[0] if competition.get('broadcasts') else 'No TV info'
                         
                         final_score_games.append({
