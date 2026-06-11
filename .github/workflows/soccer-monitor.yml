@@ -49,6 +49,20 @@ jobs:
         print(f"Total games found: {len(data.get('events', []))}")
         
         if 'events' in data and data['events']:
+            print(f"\nAll games today:")
+            for event in data['events']:
+                try:
+                    competition = event['competitions'][0]
+                    status = competition['status']['type']['name']
+                    status_detail = competition['status']['type']['detail']
+                    home_team = next((t for t in competition['competitors'] if t['homeAway'] == 'home'), None)
+                    away_team = next((t for t in competition['competitors'] if t['homeAway'] == 'away'), None)
+                    if home_team and away_team:
+                        print(f"  {away_team['team']['displayName']} vs {home_team['team']['displayName']} - Status: {status} ({status_detail})")
+                except:
+                    pass
+        
+        if 'events' in data and data['events']:
             for event in data['events']:
                 try:
                     game_id = event['id']
