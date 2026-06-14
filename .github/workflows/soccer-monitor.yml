@@ -26,15 +26,18 @@ jobs:
         
         touch alerted_games.txt
         
-        python3 << 'PYEOF' "$CURRENT_DATE_EST"
+        # Export date so Python can access it
+        export CURRENT_DATE_EST
+        
+        python3 << 'PYEOF'
 import json
 import os
 import sys
 import urllib.request
 from datetime import datetime, timezone
 
-# Get current date from bash (EST with DST handling)
-current_date = sys.argv[1]
+# Get current date from environment variable (EST with DST handling)
+current_date = os.environ.get('CURRENT_DATE_EST')
 
 # World Cup 2026 Group Mappings
 TEAM_GROUPS = {
