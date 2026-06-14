@@ -14,9 +14,14 @@ jobs:
     - name: Check for World Cup finals
       run: |
         TODAY=$(TZ='America/New_York' date +%Y%m%d)
+        YESTERDAY=$(TZ='America/New_York' date -d 'yesterday' +%Y%m%d)
+        export CURRENT_DATE_EST=$(TZ='America/New_York' date +%Y%m%d)
+        
+        echo "Current date (EST): $CURRENT_DATE_EST"
         
         echo "Fetching World Cup games..."
-        curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=$TODAY" > worldcup.json
+        curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=$TODAY" > worldcup_today.json
+        curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=$YESTERDAY" > worldcup_yesterday.json
         
         touch alerted_games.txt
         
@@ -28,18 +33,30 @@ jobs:
         
         # World Cup 2026 Group Mappings
         TEAM_GROUPS = {
-            'Mexico': 'Group A', 'South Africa': 'Group A', 'Korea Republic': 'Group A', 'Uruguay': 'Group A',
-            'Canada': 'Group B', 'Egypt': 'Group B', 'Qatar': 'Group B', 'Japan': 'Group B',
-            'Brazil': 'Group C', 'Colombia': 'Group C', 'Haiti': 'Group C', 'Paraguay': 'Group C',
-            'USA': 'Group D', 'Morocco': 'Group D', 'Australia': 'Group D',
-            'Germany': 'Group E', 'Italy': 'Group E', 'Hong Kong': 'Group E', 'Thailand': 'Group E',
-            'Netherlands': 'Group F', 'Belgium': 'Group F', 'Iceland': 'Group F',
-            'England': 'Group G', 'IR Iran': 'Group G', 'New Zealand': 'Group G',
-            'Spain': 'Group H', 'Chile': 'Group H', 'Saudi Arabia': 'Group H',
-            'France': 'Group I', 'Venezuela': 'Group I', 'Denmark': 'Group I',
+            # Group A
+            'Mexico': 'Group A', 'South Korea': 'Group A', 'Korea Republic': 'Group A', 'Czechia': 'Group A', 'Czech Republic': 'Group A', 'South Africa': 'Group A',
+            # Group B
+            'Switzerland': 'Group B', 'Canada': 'Group B', 'Qatar': 'Group B', 'Bosnia-Herzegovina': 'Group B', 'Bosnia and Herzegovina': 'Group B',
+            # Group C
+            'Brazil': 'Group C', 'Haiti': 'Group C', 'Morocco': 'Group C', 'Scotland': 'Group C',
+            # Group D
+            'United States': 'Group D', 'USA': 'Group D', 'Türkiye': 'Group D', 'Turkey': 'Group D', 'Australia': 'Group D', 'Paraguay': 'Group D',
+            # Group E
+            'Germany': 'Group E', 'Curaçao': 'Group E', 'Curacao': 'Group E', 'Ivory Coast': 'Group E', "Côte d'Ivoire": 'Group E', 'Ecuador': 'Group E',
+            # Group F
+            'Netherlands': 'Group F', 'Japan': 'Group F', 'Sweden': 'Group F', 'Tunisia': 'Group F',
+            # Group G
+            'Belgium': 'Group G', 'Egypt': 'Group G', 'Iran': 'Group G', 'IR Iran': 'Group G', 'New Zealand': 'Group G',
+            # Group H
+            'Spain': 'Group H', 'Cape Verde': 'Group H', 'Saudi Arabia': 'Group H', 'Uruguay': 'Group H',
+            # Group I
+            'France': 'Group I', 'Senegal': 'Group I', 'Iraq': 'Group I', 'Norway': 'Group I',
+            # Group J
             'Argentina': 'Group J', 'Algeria': 'Group J', 'Austria': 'Group J', 'Jordan': 'Group J',
-            'Portugal': 'Group K', 'Uzbekistan': 'Group K', 'Sweden': 'Group K',
-            'Croatia': 'Group L', 'Ghana': 'Group L', 'South Korea': 'Group L'
+            # Group K
+            'Portugal': 'Group K', 'Congo DR': 'Group K', 'Democratic Republic of the Congo': 'Group K', 'Uzbekistan': 'Group K', 'Colombia': 'Group K',
+            # Group L
+            'England': 'Group L', 'Croatia': 'Group L', 'Ghana': 'Group L', 'Panama': 'Group L'
         }
         
         with open('worldcup.json', 'r') as f:
@@ -62,11 +79,11 @@ jobs:
         final_score_games = []
         
         print(f"\n🏆 World Cup Summary:")
-        print(f"Total games found: {len(data.get('events', []))}")
+        print(f"Total games found: {len(all_events)}")
         
-        if 'events' in data and data['events']:
+        if all_events:
             print(f"\nAll games today:")
-            for event in data['events']:
+            for event in all_events:
                 try:
                     competition = event['competitions'][0]
                     status = competition['status']['type']['name']
@@ -78,8 +95,8 @@ jobs:
                 except:
                     pass
         
-        if 'events' in data and data['events']:
-            for event in data['events']:
+        if all_events:
+            for event in all_events:
                 try:
                     game_id = event['id']
                     competition = event['competitions'][0]
@@ -246,7 +263,7 @@ jobs:
         print(f"\nAlerted games today: {len(alerted_games)}")
         EOF
         
-        python3 check_worldcup.py
+        python3 check_worldcup.py "$CURRENT_DATE_EST"
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     
