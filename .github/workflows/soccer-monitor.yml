@@ -26,13 +26,10 @@ jobs:
         
         touch alerted_games.txt
         
-        # Export date so Python can access it
-        export CURRENT_DATE_EST
-        
-        python3 << 'PYEOF'
+        # Create Python script
+        cat << 'EOF' > check_worldcup.py
 import json
 import os
-import sys
 import urllib.request
 from datetime import datetime, timezone
 
@@ -279,7 +276,11 @@ with open('alerted_games.txt', 'w') as f:
     f.write(','.join(sorted(alerted_games)))
 
 print(f"\nAlerted games today: {len(alerted_games)}")
-PYEOF
+EOF
+        
+        # Export date and run Python script
+        export CURRENT_DATE_EST
+        python3 check_worldcup.py
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     
