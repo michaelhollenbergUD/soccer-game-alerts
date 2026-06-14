@@ -1,4 +1,4 @@
-name: World Cup Final Scores
+name: World Cup Alerts
 
 on:
   workflow_dispatch:
@@ -11,259 +11,272 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
       
-    - name: Check for World Cup finals
+    - name: Check for World Cup games
       run: |
+        # Get dates in Eastern Time (handles DST automatically)
         TODAY=$(TZ='America/New_York' date +%Y%m%d)
         YESTERDAY=$(TZ='America/New_York' date -d 'yesterday' +%Y%m%d)
-        export CURRENT_DATE_EST=$(TZ='America/New_York' date +%Y%m%d)
+        CURRENT_DATE_EST=$(TZ='America/New_York' date +%Y%m%d)
         
         echo "Current date (EST): $CURRENT_DATE_EST"
+        echo "Fetching World Cup games for today ($TODAY) and yesterday ($YESTERDAY)..."
         
-        echo "Fetching World Cup games..."
         curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=$TODAY" > worldcup_today.json
         curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=$YESTERDAY" > worldcup_yesterday.json
         
         touch alerted_games.txt
         
-        cat << 'EOF' > check_worldcup.py
-        import json
-        import os
-        import urllib.request
-        from datetime import datetime, timezone
-        
-        # World Cup 2026 Group Mappings
-        TEAM_GROUPS = {
-            # Group A
-            'Mexico': 'Group A', 'South Korea': 'Group A', 'Korea Republic': 'Group A', 'Czechia': 'Group A', 'Czech Republic': 'Group A', 'South Africa': 'Group A',
-            # Group B
-            'Switzerland': 'Group B', 'Canada': 'Group B', 'Qatar': 'Group B', 'Bosnia-Herzegovina': 'Group B', 'Bosnia and Herzegovina': 'Group B',
-            # Group C
-            'Brazil': 'Group C', 'Haiti': 'Group C', 'Morocco': 'Group C', 'Scotland': 'Group C',
-            # Group D
-            'United States': 'Group D', 'USA': 'Group D', 'Türkiye': 'Group D', 'Turkey': 'Group D', 'Australia': 'Group D', 'Paraguay': 'Group D',
-            # Group E
-            'Germany': 'Group E', 'Curaçao': 'Group E', 'Curacao': 'Group E', 'Ivory Coast': 'Group E', "Côte d'Ivoire": 'Group E', 'Ecuador': 'Group E',
-            # Group F
-            'Netherlands': 'Group F', 'Japan': 'Group F', 'Sweden': 'Group F', 'Tunisia': 'Group F',
-            # Group G
-            'Belgium': 'Group G', 'Egypt': 'Group G', 'Iran': 'Group G', 'IR Iran': 'Group G', 'New Zealand': 'Group G',
-            # Group H
-            'Spain': 'Group H', 'Cape Verde': 'Group H', 'Saudi Arabia': 'Group H', 'Uruguay': 'Group H',
-            # Group I
-            'France': 'Group I', 'Senegal': 'Group I', 'Iraq': 'Group I', 'Norway': 'Group I',
-            # Group J
-            'Argentina': 'Group J', 'Algeria': 'Group J', 'Austria': 'Group J', 'Jordan': 'Group J',
-            # Group K
-            'Portugal': 'Group K', 'Congo DR': 'Group K', 'Democratic Republic of the Congo': 'Group K', 'Uzbekistan': 'Group K', 'Colombia': 'Group K',
-            # Group L
-            'England': 'Group L', 'Croatia': 'Group L', 'Ghana': 'Group L', 'Panama': 'Group L'
-        }
-        
-        with open('worldcup.json', 'r') as f:
-            data = json.load(f)
-        
-        alerted_games = set()
+        python3 << 'PYEOF' "$CURRENT_DATE_EST"
+import json
+import os
+import sys
+import urllib.request
+from datetime import datetime, timezone
+
+# Get current date from bash (EST with DST handling)
+current_date = sys.argv[1]
+
+# World Cup 2026 Group Mappings
+TEAM_GROUPS = {
+    'Mexico': 'Group A', 'South Korea': 'Group A', 'Korea Republic': 'Group A', 
+    'Czechia': 'Group A', 'Czech Republic': 'Group A', 'South Africa': 'Group A',
+    'Switzerland': 'Group B', 'Canada': 'Group B', 'Qatar': 'Group B', 
+    'Bosnia-Herzegovina': 'Group B', 'Bosnia and Herzegovina': 'Group B',
+    'Brazil': 'Group C', 'Haiti': 'Group C', 'Morocco': 'Group C', 'Scotland': 'Group C',
+    'United States': 'Group D', 'USA': 'Group D', 'Türkiye': 'Group D', 
+    'Turkey': 'Group D', 'Australia': 'Group D', 'Paraguay': 'Group D',
+    'Germany': 'Group E', 'Curaçao': 'Group E', 'Curacao': 'Group E', 
+    'Ivory Coast': 'Group E', "Côte d'Ivoire": 'Group E', 'Ecuador': 'Group E',
+    'Netherlands': 'Group F', 'Japan': 'Group F', 'Sweden': 'Group F', 'Tunisia': 'Group F',
+    'Belgium': 'Group G', 'Egypt': 'Group G', 'Iran': 'Group G', 
+    'IR Iran': 'Group G', 'New Zealand': 'Group G',
+    'Spain': 'Group H', 'Cape Verde': 'Group H', 'Saudi Arabia': 'Group H', 'Uruguay': 'Group H',
+    'France': 'Group I', 'Senegal': 'Group I', 'Iraq': 'Group I', 'Norway': 'Group I',
+    'Argentina': 'Group J', 'Algeria': 'Group J', 'Austria': 'Group J', 'Jordan': 'Group J',
+    'Portugal': 'Group K', 'Congo DR': 'Group K', 'Democratic Republic of the Congo': 'Group K', 
+    'Uzbekistan': 'Group K', 'Colombia': 'Group K',
+    'England': 'Group L', 'Croatia': 'Group L', 'Ghana': 'Group L', 'Panama': 'Group L'
+}
+
+# Read World Cup games from today and yesterday
+all_events = []
+
+try:
+    with open('worldcup_today.json', 'r') as f:
+        data = json.load(f)
+        if 'events' in data:
+            all_events.extend(data['events'])
+except:
+    pass
+
+try:
+    with open('worldcup_yesterday.json', 'r') as f:
+        data = json.load(f)
+        if 'events' in data:
+            all_events.extend(data['events'])
+except:
+    pass
+
+# Read alerted games
+alerted_games = set()
+try:
+    with open('alerted_games.txt', 'r') as f:
+        content = f.read().strip()
+        if content:
+            alerted_games = set(content.split(','))
+except:
+    pass
+
+# Filter out old alerts
+alerted_games = {g for g in alerted_games if g.startswith(current_date)}
+
+starting_soon_games = []
+final_score_games = []
+
+print(f"\nUsing date (EST): {current_date}")
+print(f"🏆 World Cup Summary:")
+print(f"Total games found: {len(all_events)}")
+
+if all_events:
+    print(f"\nAll games:")
+    for event in all_events:
         try:
-            with open('alerted_games.txt', 'r') as f:
-                content = f.read().strip()
-                if content:
-                    alerted_games = set(content.split(','))
+            competition = event['competitions'][0]
+            status = competition['status']['type']['name']
+            status_detail = competition['status']['type']['detail']
+            home_team = next((t for t in competition['competitors'] if t['homeAway'] == 'home'), None)
+            away_team = next((t for t in competition['competitors'] if t['homeAway'] == 'away'), None)
+            if home_team and away_team:
+                print(f"  {away_team['team']['displayName']} vs {home_team['team']['displayName']} - {status} ({status_detail})")
         except:
             pass
-        
-        current_date = datetime.now().strftime('%Y%m%d')
-        alerted_games = {g for g in alerted_games if g.startswith(current_date)}
-        
-        # Process games
-        starting_soon_games = []
-        final_score_games = []
-        
-        print(f"\n🏆 World Cup Summary:")
-        print(f"Total games found: {len(all_events)}")
-        
-        if all_events:
-            print(f"\nAll games today:")
-            for event in all_events:
-                try:
-                    competition = event['competitions'][0]
-                    status = competition['status']['type']['name']
-                    status_detail = competition['status']['type']['detail']
-                    home_team = next((t for t in competition['competitors'] if t['homeAway'] == 'home'), None)
-                    away_team = next((t for t in competition['competitors'] if t['homeAway'] == 'away'), None)
-                    if home_team and away_team:
-                        print(f"  {away_team['team']['displayName']} vs {home_team['team']['displayName']} - Status: {status} ({status_detail})")
-                except:
-                    pass
-        
-        if all_events:
-            for event in all_events:
-                try:
-                    game_id = event['id']
-                    competition = event['competitions'][0]
-                    status = competition['status']['type']['name']
-                    game_date = competition.get('date')
+
+if all_events:
+    for event in all_events:
+        try:
+            game_id = event['id']
+            competition = event['competitions'][0]
+            status = competition['status']['type']['name']
+            game_date = competition.get('date')
+            
+            home_team = next((t for t in competition['competitors'] if t['homeAway'] == 'home'), None)
+            away_team = next((t for t in competition['competitors'] if t['homeAway'] == 'away'), None)
+            
+            if not home_team or not away_team:
+                continue
+            
+            away_name = away_team['team']['displayName']
+            home_name = home_team['team']['displayName']
+            away_score = away_team.get('score', 0)
+            home_score = home_team.get('score', 0)
+            
+            # Get group from team mapping
+            group_info = TEAM_GROUPS.get(away_name, TEAM_GROUPS.get(home_name, 'Group Unknown'))
+            
+            starting_key = f"{current_date}_{game_id}_starting"
+            final_key = f"{current_date}_{game_id}_final"
+            
+            # Check for games starting soon (0-15 minutes)
+            if status == 'STATUS_SCHEDULED' and game_date and starting_key not in alerted_games:
+                game_start = datetime.fromisoformat(game_date.replace('Z', '+00:00'))
+                current_time_utc = datetime.now(timezone.utc)
+                minutes_until = int((game_start - current_time_utc).total_seconds() / 60)
+                
+                if 0 <= minutes_until <= 15:
+                    broadcast = competition.get('broadcasts', [{}])[0].get('names', ['No TV info'])[0] if competition.get('broadcasts') else 'No TV info'
                     
-                    home_team = next((t for t in competition['competitors'] if t['homeAway'] == 'home'), None)
-                    away_team = next((t for t in competition['competitors'] if t['homeAway'] == 'away'), None)
+                    starting_soon_games.append({
+                        'away_team': away_name,
+                        'home_team': home_name,
+                        'minutes_until': minutes_until,
+                        'broadcast': broadcast,
+                        'group': group_info
+                    })
+                    alerted_games.add(starting_key)
                     
-                    if not home_team or not away_team:
-                        continue
+                    with open('alerted_games.txt', 'w') as f:
+                        f.write(','.join(sorted(alerted_games)))
                     
-                    away_name = away_team['team']['displayName']
-                    home_name = home_team['team']['displayName']
-                    away_score = away_team.get('score', 0)
-                    home_score = home_team.get('score', 0)
-                    
-                    # Get group from team mapping
-                    group_info = TEAM_GROUPS.get(away_name, TEAM_GROUPS.get(home_name, 'Group Unknown'))
-                    
-                    # Separate tracking keys for starting vs final alerts
-                    starting_key = f"{current_date}_{game_id}_starting"
-                    final_key = f"{current_date}_{game_id}_final"
-                    
-                    # Check for games starting soon (0-15 minutes)
-                    if status == 'STATUS_SCHEDULED' and game_date and starting_key not in alerted_games:
-                        game_start = datetime.fromisoformat(game_date.replace('Z', '+00:00'))
-                        current_time_utc = datetime.now(timezone.utc)
-                        minutes_until = int((game_start - current_time_utc).total_seconds() / 60)
-                        
-                        if 0 <= minutes_until <= 15:
-                            broadcast = competition.get('broadcasts', [{}])[0].get('names', ['No TV info'])[0] if competition.get('broadcasts') else 'No TV info'
-                            
-                            starting_soon_games.append({
-                                'away_team': away_name,
-                                'home_team': home_name,
-                                'minutes_until': minutes_until,
-                                'broadcast': broadcast,
-                                'group': group_info
-                            })
-                            alerted_games.add(starting_key)
-                            
-                            with open('alerted_games.txt', 'w') as f:
-                                f.write(','.join(sorted(alerted_games)))
-                            
-                            print(f"  → Starting alert queued: {away_name} vs {home_name}")
-                    
-                    # Check for games that are FINAL (soccer uses STATUS_FULL_TIME)
-                    if (status == 'STATUS_FINAL' or status == 'STATUS_FULL_TIME') and final_key not in alerted_games:
-                        broadcast = competition.get('broadcasts', [{}])[0].get('names', ['No TV info'])[0] if competition.get('broadcasts') else 'No TV info'
-                        
-                        final_score_games.append({
-                            'away_team': away_name,
-                            'home_team': home_name,
-                            'away_score': away_score,
-                            'home_score': home_score,
-                            'broadcast': broadcast,
-                            'group': group_info
-                        })
-                        alerted_games.add(final_key)
-                        
-                        with open('alerted_games.txt', 'w') as f:
-                            f.write(','.join(sorted(alerted_games)))
-                        
-                        print(f"  → Final alert queued: {away_name} {away_score} - {home_score} {home_name} ({group_info})")
-                except Exception as e:
-                    print(f"Error: {e}")
-        
-        webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
-        
-        all_alerts = starting_soon_games + final_score_games
-        
-        if all_alerts and webhook_url:
-            for game in all_alerts:
-                if game.get('minutes_until') is not None:
-                    # Starting soon alert
-                    slack_message = {
-                        "text": f"🏆 WORLD CUP STARTING: {game['away_team']} vs {game['home_team']} in ~{game['minutes_until']} minutes",
-                        "blocks": [
+                    print(f"  → Starting alert queued: {away_name} vs {home_name}")
+            
+            # Check for finished games (STATUS_FULL_TIME or STATUS_FINAL)
+            if (status == 'STATUS_FULL_TIME' or status == 'STATUS_FINAL') and final_key not in alerted_games:
+                broadcast = competition.get('broadcasts', [{}])[0].get('names', ['No TV info'])[0] if competition.get('broadcasts') else 'No TV info'
+                
+                final_score_games.append({
+                    'away_team': away_name,
+                    'home_team': home_name,
+                    'away_score': away_score,
+                    'home_score': home_score,
+                    'broadcast': broadcast,
+                    'group': group_info
+                })
+                alerted_games.add(final_key)
+                
+                with open('alerted_games.txt', 'w') as f:
+                    f.write(','.join(sorted(alerted_games)))
+                
+                print(f"  → Final alert queued: {away_name} {away_score} - {home_score} {home_name}")
+        except Exception as e:
+            print(f"Error processing game: {e}")
+
+webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
+
+all_alerts = starting_soon_games + final_score_games
+
+if all_alerts and webhook_url:
+    for game in all_alerts:
+        if game.get('minutes_until') is not None:
+            # Starting alert
+            slack_message = {
+                "text": f"🏆 WORLD CUP STARTING: {game['away_team']} vs {game['home_team']} in ~{game['minutes_until']} minutes",
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "🏆 WORLD CUP - GAME STARTING",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*{game['away_team']}* vs *{game['home_team']}*"
+                        }
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
                             {
-                                "type": "header",
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "🏆 WORLD CUP - GAME STARTING",
-                                    "emoji": True
-                                }
-                            },
-                            {
-                                "type": "section",
-                                "text": {
-                                    "type": "mrkdwn",
-                                    "text": f"*{game['away_team']}* vs *{game['home_team']}*"
-                                }
-                            },
-                            {
-                                "type": "context",
-                                "elements": [
-                                    {
-                                        "type": "mrkdwn",
-                                        "text": f"📋 {game['group']} • ⏰ Starting in ~{game['minutes_until']} minutes • 📺 {game['broadcast']}"
-                                    }
-                                ]
+                                "type": "mrkdwn",
+                                "text": f"📋 {game['group']} • ⏰ Starting in ~{game['minutes_until']} minutes • 📺 {game['broadcast']}"
                             }
                         ]
                     }
-                else:
-                    # Final score alert
-                    slack_message = {
-                        "text": f"🏆 WORLD CUP FINAL: {game['away_team']} {game['away_score']} - {game['home_score']} {game['home_team']}",
-                        "blocks": [
-                            {
-                                "type": "header",
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "🏆 WORLD CUP - FINAL SCORE",
-                                    "emoji": True
-                                }
-                            },
-                            {
-                                "type": "section",
-                                "fields": [
-                                    {
-                                        "type": "mrkdwn",
-                                        "text": f"*{game['away_team']}*\n{game['away_score']}"
-                                    },
-                                    {
-                                        "type": "mrkdwn",
-                                        "text": f"*{game['home_team']}*\n{game['home_score']}"
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "context",
-                                "elements": [
-                                    {
-                                        "type": "mrkdwn",
-                                        "text": f"📋 {game['group']} • 📺 {game['broadcast']}"
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                
-                req = urllib.request.Request(
-                    webhook_url,
-                    data=json.dumps(slack_message).encode('utf-8'),
-                    headers={'Content-Type': 'application/json'}
-                )
-                
-                try:
-                    with urllib.request.urlopen(req) as response:
-                        if game.get('minutes_until') is not None:
-                            print(f"✓ Sent starting: {game['away_team']} vs {game['home_team']}")
-                        else:
-                            print(f"✓ Sent final: {game['away_team']} {game['away_score']} - {game['home_score']} {game['home_team']}")
-                except Exception as e:
-                    print(f"✗ Error: {e}")
+                ]
+            }
         else:
-            print("\nNo new World Cup alerts.")
+            # Final score alert
+            slack_message = {
+                "text": f"🏆 WORLD CUP FINAL: {game['away_team']} {game['away_score']} - {game['home_score']} {game['home_team']}",
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "🏆 WORLD CUP - FINAL SCORE",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*{game['away_team']}*\n{game['away_score']}"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*{game['home_team']}*\n{game['home_score']}"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"📋 {game['group']} • 📺 {game['broadcast']}"
+                            }
+                        ]
+                    }
+                ]
+            }
         
-        with open('alerted_games.txt', 'w') as f:
-            f.write(','.join(sorted(alerted_games)))
+        req = urllib.request.Request(
+            webhook_url,
+            data=json.dumps(slack_message).encode('utf-8'),
+            headers={'Content-Type': 'application/json'}
+        )
         
-        print(f"\nAlerted games today: {len(alerted_games)}")
-        EOF
-        
-        python3 check_worldcup.py "$CURRENT_DATE_EST"
+        try:
+            with urllib.request.urlopen(req) as response:
+                if game.get('minutes_until') is not None:
+                    print(f"✓ Sent starting: {game['away_team']} vs {game['home_team']}")
+                else:
+                    print(f"✓ Sent final: {game['away_team']} {game['away_score']} - {game['home_score']} {game['home_team']}")
+        except Exception as e:
+            print(f"✗ Error: {e}")
+else:
+    print("\nNo new World Cup alerts.")
+
+with open('alerted_games.txt', 'w') as f:
+    f.write(','.join(sorted(alerted_games)))
+
+print(f"\nAlerted games today: {len(alerted_games)}")
+PYEOF
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     
