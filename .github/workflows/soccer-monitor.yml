@@ -47,6 +47,21 @@ jobs:
             'England': 'Group L', 'Croatia': 'Group L', 'Ghana': 'Group L', 'Panama': 'Group L'
         }
         
+        TEAM_FLAGS = {
+            'Mexico': ':flag-mx:', 'South Korea': ':flag-kr:', 'Korea Republic': ':flag-kr:', 'Czechia': ':flag-cz:', 'Czech Republic': ':flag-cz:', 'South Africa': ':flag-za:',
+            'Switzerland': ':flag-ch:', 'Canada': ':flag-ca:', 'Qatar': ':flag-qa:', 'Bosnia-Herzegovina': ':flag-ba:', 'Bosnia and Herzegovina': ':flag-ba:',
+            'Brazil': ':flag-br:', 'Haiti': ':flag-ht:', 'Morocco': ':flag-ma:', 'Scotland': ':flag-scotland:',
+            'United States': ':flag-us:', 'USA': ':flag-us:', 'Turkiye': ':flag-tr:', 'Turkey': ':flag-tr:', 'Australia': ':flag-au:', 'Paraguay': ':flag-py:',
+            'Germany': ':flag-de:', 'Curacao': ':flag-cw:', 'Ivory Coast': ':flag-ci:', 'Ecuador': ':flag-ec:',
+            'Netherlands': ':flag-nl:', 'Japan': ':flag-jp:', 'Sweden': ':flag-se:', 'Tunisia': ':flag-tn:',
+            'Belgium': ':flag-be:', 'Egypt': ':flag-eg:', 'Iran': ':flag-ir:', 'IR Iran': ':flag-ir:', 'New Zealand': ':flag-nz:',
+            'Spain': ':flag-es:', 'Cape Verde': ':flag-cv:', 'Saudi Arabia': ':flag-sa:', 'Uruguay': ':flag-uy:',
+            'France': ':flag-fr:', 'Senegal': ':flag-sn:', 'Iraq': ':flag-iq:', 'Norway': ':flag-no:',
+            'Argentina': ':flag-ar:', 'Algeria': ':flag-dz:', 'Austria': ':flag-at:', 'Jordan': ':flag-jo:',
+            'Portugal': ':flag-pt:', 'Congo DR': ':flag-cd:', 'Uzbekistan': ':flag-uz:', 'Colombia': ':flag-co:',
+            'England': ':flag-england:', 'Croatia': ':flag-hr:', 'Ghana': ':flag-gh:', 'Panama': ':flag-pa:'
+        }
+        
         all_events = []
         
         try:
@@ -119,6 +134,8 @@ jobs:
                 home_score = home_team.get('score', 0)
                 
                 group_info = TEAM_GROUPS.get(away_name, TEAM_GROUPS.get(home_name, 'Group Unknown'))
+                away_flag = TEAM_FLAGS.get(away_name, '')
+                home_flag = TEAM_FLAGS.get(home_name, '')
                 
                 starting_key = f"{current_date}_{game_id}_starting"
                 final_key = f"{current_date}_{game_id}_final"
@@ -134,6 +151,8 @@ jobs:
                         starting_soon_games.append({
                             'away_team': away_name,
                             'home_team': home_name,
+                            'away_flag': away_flag,
+                            'home_flag': home_flag,
                             'minutes_until': minutes_until,
                             'broadcast': broadcast,
                             'group': group_info
@@ -149,6 +168,8 @@ jobs:
                     final_score_games.append({
                         'away_team': away_name,
                         'home_team': home_name,
+                        'away_flag': away_flag,
+                        'home_flag': home_flag,
                         'away_score': away_score,
                         'home_score': home_score,
                         'broadcast': broadcast,
@@ -184,7 +205,7 @@ jobs:
                                 "type": "section",
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": f"*{game['away_team']}* vs *{game['home_team']}*"
+                                    "text": f"*{game['away_team']}* {game['away_flag']} vs {game['home_flag']} *{game['home_team']}*"
                                 }
                             },
                             {
@@ -215,11 +236,11 @@ jobs:
                                 "fields": [
                                     {
                                         "type": "mrkdwn",
-                                        "text": f"*{game['away_team']}*\n{game['away_score']}"
+                                        "text": f"{game['away_team']} {game['away_flag']}\n{game['away_score']}"
                                     },
                                     {
                                         "type": "mrkdwn",
-                                        "text": f"*{game['home_team']}*\n{game['home_score']}"
+                                        "text": f"{game['home_team']} {game['home_flag']}\n{game['home_score']}"
                                     }
                                 ]
                             },
