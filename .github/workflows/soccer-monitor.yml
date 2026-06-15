@@ -74,7 +74,11 @@ jobs:
         except:
             pass
         
-        alerted_games = {g for g in alerted_games if g.startswith(current_date)}
+        # Keep alerts from past 2 days to prevent midnight duplicates
+        # Calculate yesterday's date too
+        from datetime import timedelta
+        yesterday_date = (datetime.now(timezone.utc) - timedelta(days=1, hours=4)).strftime('%Y%m%d')
+        alerted_games = {g for g in alerted_games if g.startswith(current_date) or g.startswith(yesterday_date)}
         
         starting_soon_games = []
         final_score_games = []
