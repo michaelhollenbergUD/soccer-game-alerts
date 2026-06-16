@@ -30,7 +30,8 @@ jobs:
         import urllib.request
         from datetime import datetime, timezone
         
-        current_date = os.environ.get('CURRENT_DATE_EST', datetime.now().strftime('%Y%m%d'))
+        current_date = os.environ.get('CURRENT_DATE_EST', '')
+        yesterday_date = os.environ.get('YESTERDAY_DATE_EST', '')
         
         TEAM_GROUPS = {
             'Mexico': 'Group A', 'South Korea': 'Group A', 'Korea Republic': 'Group A', 'Czechia': 'Group A', 'Czech Republic': 'Group A', 'South Africa': 'Group A',
@@ -90,9 +91,6 @@ jobs:
             pass
         
         # Keep alerts from past 2 days to prevent midnight duplicates
-        # Calculate yesterday's date too
-        from datetime import timedelta
-        yesterday_date = (datetime.now(timezone.utc) - timedelta(days=1, hours=4)).strftime('%Y%m%d')
         alerted_games = {g for g in alerted_games if g.startswith(current_date) or g.startswith(yesterday_date)}
         
         starting_soon_games = []
@@ -280,6 +278,7 @@ jobs:
         EOF
         
         export CURRENT_DATE_EST
+        export YESTERDAY_DATE_EST=$YESTERDAY
         python3 check_worldcup.py
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
