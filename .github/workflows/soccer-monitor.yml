@@ -90,8 +90,8 @@ jobs:
         except:
             pass
         
-        # Keep alerts from past 2 days to prevent midnight duplicates
-        alerted_games = {g for g in alerted_games if g.startswith(current_date) or g.startswith(yesterday_date)}
+        # Don't filter by date - keep all alerts to prevent duplicates
+        # File will accumulate but stay small (only a few hundred entries max)
         
         starting_soon_games = []
         final_score_games = []
@@ -135,8 +135,9 @@ jobs:
                 away_flag = TEAM_FLAGS.get(away_name, '')
                 home_flag = TEAM_FLAGS.get(home_name, '')
                 
-                starting_key = f"{current_date}_{game_id}_starting"
-                final_key = f"{current_date}_{game_id}_final"
+                # Tracking keys WITHOUT date - prevents midnight duplicates
+                starting_key = f"{game_id}_starting"
+                final_key = f"{game_id}_final"
                 
                 if status == 'STATUS_SCHEDULED' and game_date and starting_key not in alerted_games:
                     game_start = datetime.fromisoformat(game_date.replace('Z', '+00:00'))
