@@ -139,7 +139,14 @@ jobs:
                 starting_key = f"{game_id}_starting"
                 final_key = f"{game_id}_final"
                 
-                if status == 'STATUS_SCHEDULED' and game_date and starting_key not in alerted_games:
+                # Also check old format keys (with date prefix) during transition
+                old_starting_keys = [k for k in alerted_games if k.endswith(f"_{game_id}_starting")]
+                old_final_keys = [k for k in alerted_games if k.endswith(f"_{game_id}_final")]
+                
+                already_alerted_starting = starting_key in alerted_games or len(old_starting_keys) > 0
+                already_alerted_final = final_key in alerted_games or len(old_final_keys) > 0
+                
+                if status == 'STATUS_SCHEDULED' and game_date and not already_alerted_starting:
                     game_start = datetime.fromisoformat(game_date.replace('Z', '+00:00'))
                     current_time_utc = datetime.now(timezone.utc)
                     minutes_until = int((game_start - current_time_utc).total_seconds() / 60)
@@ -161,7 +168,7 @@ jobs:
                         with open('alerted_games.txt', 'w') as f:
                             f.write(','.join(sorted(alerted_games)))
                 
-                if (status == 'STATUS_FULL_TIME' or status == 'STATUS_FINAL') and final_key not in alerted_games:
+                if (status == 'STATUS_FULL_TIME' or status == 'STATUS_FINAL') and not already_alerted_final:
                     broadcast = competition.get('broadcasts', [{}])[0].get('names', ['No TV info'])[0] if competition.get('broadcasts') else 'No TV info'
                     
                     final_score_games.append({
