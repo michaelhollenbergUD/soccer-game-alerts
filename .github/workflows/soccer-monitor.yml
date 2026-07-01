@@ -108,11 +108,13 @@ jobs:
                     status_detail = competition['status']['type']['detail']
                     home_team = next((t for t in competition['competitors'] if t['homeAway'] == 'home'), None)
                     away_team = next((t for t in competition['competitors'] if t['homeAway'] == 'away'), None)
-                    event_name = event.get('name', 'N/A')
                     if home_team and away_team:
-                        print(f"  {away_team['team']['displayName']} vs {home_team['team']['displayName']} [{status_detail}] - Event name: {event_name}")
-                except:
-                    pass
+                        print(f"  {away_team['team']['displayName']} vs {home_team['team']['displayName']} [{status_detail}]")
+                        print(f"    event keys: {list(event.keys())}")
+                        print(f"    season: {event.get('season', 'N/A')}")
+                        print(f"    competition notes: {competition.get('notes', 'N/A')}")
+                except Exception as e:
+                    print(f"  Error: {e}")
         
         for event in all_events:
             try:
