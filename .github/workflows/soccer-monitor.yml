@@ -219,7 +219,7 @@ jobs:
                                 "elements": [
                                     {
                                         "type": "mrkdwn",
-                                        "text": f"📋 {game['group']} • ⏰ Starting in ~{game['minutes_until']} minutes • 📺 {game['broadcast']}"
+                                        "text": f"⏰ Starting in ~{game['minutes_until']} minutes • 📺 {game['broadcast']}"
                                     }
                                 ]
                             }
@@ -255,7 +255,7 @@ jobs:
                                 "elements": [
                                     {
                                         "type": "mrkdwn",
-                                        "text": f"📋 {game['group']} • 📺 {game['broadcast']}"
+                                        "text": f"📺 {game['broadcast']}"
                                     }
                                 ]
                             }
