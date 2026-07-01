@@ -109,10 +109,7 @@ jobs:
                     home_team = next((t for t in competition['competitors'] if t['homeAway'] == 'home'), None)
                     away_team = next((t for t in competition['competitors'] if t['homeAway'] == 'away'), None)
                     if home_team and away_team:
-                        print(f"  {away_team['team']['displayName']} vs {home_team['team']['displayName']} [{status_detail}]")
-                        print(f"    event keys: {list(event.keys())}")
-                        print(f"    season: {event.get('season', 'N/A')}")
-                        print(f"    competition notes: {competition.get('notes', 'N/A')}")
+                        print(f"  {away_team['team']['displayName']} vs {home_team['team']['displayName']} [{status_detail}] - STATUS: {status}")
                 except Exception as e:
                     print(f"  Error: {e}")
         
@@ -183,7 +180,7 @@ jobs:
                         with open('alerted_games.txt', 'w') as f:
                             f.write(','.join(sorted(alerted_games)))
                 
-                if (status == 'STATUS_FULL_TIME' or status == 'STATUS_FINAL') and not already_alerted_final:
+                if status in ['STATUS_FULL_TIME', 'STATUS_FINAL', 'STATUS_FINAL_AET', 'STATUS_FINAL_PEN'] and not already_alerted_final:
                     broadcast = competition.get('broadcasts', [{}])[0].get('names', ['No TV info'])[0] if competition.get('broadcasts') else 'No TV info'
                     
                     final_score_games.append({
