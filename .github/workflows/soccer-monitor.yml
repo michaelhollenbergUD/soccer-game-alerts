@@ -108,8 +108,9 @@ jobs:
                     status_detail = competition['status']['type']['detail']
                     home_team = next((t for t in competition['competitors'] if t['homeAway'] == 'home'), None)
                     away_team = next((t for t in competition['competitors'] if t['homeAway'] == 'away'), None)
+                    event_name = event.get('name', 'N/A')
                     if home_team and away_team:
-                        print(f"  {away_team['team']['displayName']} vs {home_team['team']['displayName']} [{status_detail}]")
+                        print(f"  {away_team['team']['displayName']} vs {home_team['team']['displayName']} [{status_detail}] - Event name: {event_name}")
                 except:
                     pass
         
@@ -134,6 +135,15 @@ jobs:
                 group_info = TEAM_GROUPS.get(away_name, TEAM_GROUPS.get(home_name, 'Group Unknown'))
                 away_flag = TEAM_FLAGS.get(away_name, '')
                 home_flag = TEAM_FLAGS.get(home_name, '')
+                
+                # Get round/stage info (Round of 32, Quarterfinal, etc.)
+                round_info = event.get('season', {}).get('slug', '')
+                if not round_info:
+                    round_info = competition.get('notes', [{}])[0].get('headline', '') if competition.get('notes') else ''
+                if not round_info:
+                    # Try to get from event name
+                    event_name = event.get('name', '')
+                    round_info = event_name if event_name else 'World Cup'
                 
                 # Tracking keys WITHOUT date - prevents midnight duplicates
                 starting_key = f"{game_id}_starting"
@@ -161,7 +171,7 @@ jobs:
                             'home_flag': home_flag,
                             'minutes_until': minutes_until,
                             'broadcast': broadcast,
-                            'group': group_info
+                            'round': round_info
                         })
                         alerted_games.add(starting_key)
                         
@@ -179,7 +189,7 @@ jobs:
                         'away_score': away_score,
                         'home_score': home_score,
                         'broadcast': broadcast,
-                        'group': group_info
+                        'round': round_info
                     })
                     alerted_games.add(final_key)
                     
@@ -219,7 +229,7 @@ jobs:
                                 "elements": [
                                     {
                                         "type": "mrkdwn",
-                                        "text": f"⏰ Starting in ~{game['minutes_until']} minutes • 📺 {game['broadcast']}"
+                                        "text": f"🏆 {game['round']} • ⏰ Starting in ~{game['minutes_until']} minutes • 📺 {game['broadcast']}"
                                     }
                                 ]
                             }
@@ -255,7 +265,7 @@ jobs:
                                 "elements": [
                                     {
                                         "type": "mrkdwn",
-                                        "text": f"📺 {game['broadcast']}"
+                                        "text": f"🏆 {game['round']} • 📺 {game['broadcast']}"
                                     }
                                 ]
                             }
