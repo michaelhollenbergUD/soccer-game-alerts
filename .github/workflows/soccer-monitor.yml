@@ -138,14 +138,17 @@ jobs:
                 away_flag = TEAM_FLAGS.get(away_name, '')
                 home_flag = TEAM_FLAGS.get(home_name, '')
                 
-                # Get round/stage info (Round of 32, Quarterfinal, etc.)
-                round_info = event.get('season', {}).get('slug', '')
-                if not round_info:
-                    round_info = competition.get('notes', [{}])[0].get('headline', '') if competition.get('notes') else ''
-                if not round_info:
-                    # Try to get from event name
-                    event_name = event.get('name', '')
-                    round_info = event_name if event_name else 'World Cup'
+                # Get round/stage info from season.slug
+                round_slug = event.get('season', {}).get('slug', '')
+                round_display_map = {
+                    'round-of-32': 'Round of 32',
+                    'round-of-16': 'Round of 16',
+                    'quarterfinal': 'Quarterfinal',
+                    'semifinal': 'Semifinal',
+                    'final': 'Final',
+                    'third-place': 'Third Place'
+                }
+                round_info = round_display_map.get(round_slug, round_slug.replace('-', ' ').title() if round_slug else 'World Cup')
                 
                 # Tracking keys WITHOUT date - prevents midnight duplicates
                 starting_key = f"{game_id}_starting"
